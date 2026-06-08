@@ -21,6 +21,10 @@ inputs:
     description: "Branch do repositório analisado."
     required: false
     default: ${{ github.ref_name }}
+  triggered_by:
+    description: "Username GitHub que acionou o scan (auto-reportado, não verificado pelo XGuardian)."
+    required: false
+    default: ${{ github.actor }}
   is_development:
     description: "Usar ambiente de desenvolvimento do XGuardian. Valores aceitos: true ou false"
     required: false
@@ -107,6 +111,7 @@ runs:
         REPORT_FILE: ${{ inputs.report }}
         REPOSITORY_NAME: ${{ inputs.repository_name }}
         BRANCH: ${{ inputs.branch }}
+        TRIGGERED_BY: ${{ inputs.triggered_by }}
         REPORTER_URL: ${{ env.REPORTER_URL }}
       run: |
         echo "::group::Enviando CycloneDX para o XGuardian"
@@ -115,6 +120,7 @@ runs:
         echo "└─────────────────────────────────────────────────────────┘"
         echo "  Repositório : ${REPOSITORY_NAME}"
         echo "  Branch      : ${BRANCH}"
+        echo "  Acionado por: ${TRIGGERED_BY}"
         echo "  Arquivo     : ${REPORT_FILE}"
         echo "  URL         : ${REPORTER_URL}"
 
@@ -127,6 +133,7 @@ runs:
           -H "Authorization: Bearer ${XGUARDIAN_TOKEN}" \
           -F "repository_name=${REPOSITORY_NAME}" \
           -F "branch=${BRANCH}" \
+          -F "triggered_by=${TRIGGERED_BY}" \
           -F "file=@${REPORT_FILE};type=application/json")
 
         echo "http_status=${HTTP_STATUS}" >> $GITHUB_OUTPUT
