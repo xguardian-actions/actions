@@ -190,7 +190,7 @@ runs:
         {
           "app_id": "${APP_ID}",
           "scan_version": "${SCAN_VERSION}",
-          "file_type": "tar",
+          "file_type": "application/x-tar",
           "container": "${CONTAINER_IMAGE}",
           "translate": "${TRANSLATE}",
           "pdf": "${PDF}",
@@ -215,9 +215,16 @@ runs:
         fi
 
         echo "🚀 Fazendo upload do .tar para S3..."
-        curl -sS -X PUT "${PRESIGNED_URL}" \
+        PUT_RESPONSE=$(curl -sS -X PUT "${PRESIGNED_URL}" \
           -H "Content-Type: application/x-tar" \
-          --data-binary "@${TAR_FILE}"
+          --data-binary "@${TAR_FILE}")
+
+        if echo "${PUT_RESPONSE}" | grep -q "<Error>"; then
+          ERROR_CODE=$(echo "${PUT_RESPONSE}" | grep -o '<Code>[^<]*</Code>' | sed 's/<[^>]*>//g')
+          echo "::error title=XGuardian Container::Falha no upload para S3: ${ERROR_CODE}"
+          echo "::endgroup::"
+          exit 1
+        fi
 
         echo "✅ Container scan enviado com sucesso!"
         echo "::notice title=XGuardian Container::Scan enviado para ${CONTAINER_IMAGE}"
