@@ -69,10 +69,6 @@ inputs:
     description: "Username GitHub que acionou o scan (auto-reportado)."
     default: ${{ github.actor }}
     required: false
-  is_development:
-    description: "Usar ambiente de desenvolvimento. Valores: true ou false"
-    default: "false"
-    required: false
 
 outputs:
   app_id:
@@ -91,18 +87,12 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Definir URLs do XGuardian
+    - name: Configurar endpoints do XGuardian
       shell: bash
       run: |
-        if [ "${{ inputs.is_development }}" == "true" ]; then
-          echo "BASE_URL=https://shield.development.xguardianplatform.io" >> $GITHUB_ENV
-          echo "UPLOADER_URL=https://uploader-mvp.development.xguardianplatform.io" >> $GITHUB_ENV
-          echo "REPORTER_URL=https://reporter.development.xguardianplatform.io" >> $GITHUB_ENV
-        else
-          echo "BASE_URL=https://shield.xguardianplatform.io" >> $GITHUB_ENV
-          echo "UPLOADER_URL=https://uploader-mvp.xguardianplatform.io" >> $GITHUB_ENV
-          echo "REPORTER_URL=https://reporter.xguardianplatform.io" >> $GITHUB_ENV
-        fi
+        echo "BASE_URL=https://shield.xguardianplatform.io" >> $GITHUB_ENV
+        echo "UPLOADER_URL=https://uploader-mvp.xguardianplatform.io" >> $GITHUB_ENV
+        echo "REPORTER_URL=https://reporter.xguardianplatform.io" >> $GITHUB_ENV
 
     - name: Configurar token de autenticação
       shell: bash
@@ -293,6 +283,48 @@ runs:
           fi
           sleep 10
         done
+        echo "::endgroup::"
+
+    - name: Aguardar finalização do scan
+      shell: bash
+      if: ${{ inputs.get_scan_id == 'true' }}
+      env:
+        REPORTER_URL: ${{ env.REPORTER_URL }}
+        API_TOKEN: ${{ env.API_TOKEN }}
+        APP_ID: ${{ env.APP_ID }}
+        SCAN_VERSION: ${{ steps.vars.outputs.app_label }}-${{ steps.vars.outputs.short_sha }}
+      run: |
+        echo "::group::⏳ Monitorando status do scan"
+        SCAN_STATUS=""
+        start_time=$(date +%s)
+        echo "🔄 Aguardando finalização (versão: ${SCAN_VERSION}). Verificação a cada 2 minutos."
+
+        check_scan_status() {
+          local response=$(curl -sS -X GET "${REPORTER_URL}/get_scan_pagination/${APP_ID}?page=1&items_per_page=10" \
+            -H 'accept: application/json' -H "Authorization: Bearer ${API_TOKEN}")
+          echo "$response" | jq . >/dev/null 2>&1 || { echo "⚠️ JSON inválido."; return 1; }
+          SCAN_DATA=$(echo "$response" | jq -r --arg v "${SCAN_VERSION}" '.data[] | select(.scanuuid == $v)')
+          [ -n "$SCAN_DATA" ] && [ "$SCAN_DATA" != "null" ] && SCAN_STATUS=$(echo "$SCAN_DATA" | jq -r '.scan_status') && return 0
+          echo "⚠️ Scan não encontrado na resposta."
+          return 1
+        }
+
+        for i in {1..30}; do
+          elapsed=$(( $(date +%s) - start_time ))
+          echo "🔍 Tentativa $i/30 — ${elapsed}s decorridos..."
+          if check_scan_status; then
+            case "$SCAN_STATUS" in
+              FINISHED) echo "✅ Scan finalizado!"; echo "::notice title=XGuardian::Scan finalizado com sucesso!"; break ;;
+              RUNNING|PENDING) echo "⏳ Status: ${SCAN_STATUS}. Próxima verificação em 2 minutos..."; sleep 120 ;;
+              FAILED) echo "::error::❌ Scan falhou durante a execução."; echo "::endgroup::"; exit 1 ;;
+              *) echo "⚠️ Status inesperado: ${SCAN_STATUS}. Aguardando 2 minutos..."; sleep 120 ;;
+            esac
+          else
+            echo "⚠️ Erro ao verificar status. Tentando em 2 minutos..."; sleep 120
+          fi
+        done
+
+        [ "$SCAN_STATUS" = "FINISHED" ] || { echo "::error::❌ Timeout: scan não finalizado após múltiplas verificações."; echo "::endgroup::"; exit 1; }
         echo "::endgroup::"
 
     - name: Finalizar outputs
