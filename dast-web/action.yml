@@ -5,8 +5,6 @@ author: "Xmart Solutions"
 branding:
   icon: "shield"
   color: purple
-version: v26.6.1
-
 inputs:
   # ========================================================================================
   # CREDENCIAIS OBRIGATÓRIAS
@@ -44,32 +42,26 @@ inputs:
   site_url:
     description: "URL completa do site a ser analisado. Obrigatório."
     required: true
-    type: string
   auth_url:
     description: "URL da página de login do site alvo."
     default: ""
     required: false
-    type: string
   logout_url:
     description: "URL da página de logout do site alvo."
     default: ""
     required: false
-    type: string
   auth_exist:
     description: "O site requer autenticação? Valores: true ou false"
-    default: false
+    default: "false"
     required: false
-    type: boolean
   user_login:
     description: "Usuário para login no site alvo (credencial do site, não da plataforma XGuardian)."
     default: ""
     required: false
-    type: string
   password_login:
     description: "Senha para login no site alvo (credencial do site, não da plataforma XGuardian)."
     default: ""
     required: false
-    type: string
   translate:
     description: "Traduz o relatório para português do Brasil. Valores: true ou false"
     default: "false"
@@ -77,6 +69,10 @@ inputs:
   pdf:
     description: "Gera relatório em PDF após o scan. Valores: true ou false"
     default: "false"
+    required: false
+  triggered_by:
+    description: "Username GitHub que acionou o scan (auto-reportado)."
+    default: ${{ github.actor }}
     required: false
   is_development:
     description: "Usar ambiente de desenvolvimento. Valores: true ou false"
@@ -114,6 +110,8 @@ runs:
       shell: bash
       run: |
         echo "::add-mask::${{ inputs.token }}"
+        echo "::add-mask::${{ inputs.user_login }}"
+        echo "::add-mask::${{ inputs.password_login }}"
         echo "API_TOKEN=${{ inputs.token }}" >> $GITHUB_ENV
 
     - name: Instalar dependências
@@ -183,6 +181,7 @@ runs:
         PASSWORD: ${{ inputs.password_login }}
         TRANSLATE: ${{ inputs.translate }}
         PDF: ${{ inputs.pdf }}
+        TRIGGERED_BY: ${{ inputs.triggered_by }}
       run: |
         echo "::group::Executando scan DAST Web"
         if [ "${APP_ID}" = "N/A" ]; then
@@ -204,7 +203,8 @@ runs:
           "userlogin": "${USER_LOGIN}",
           "passwordlogin": "${PASSWORD}",
           "translate": "${TRANSLATE}",
-          "pdf": "${PDF}"
+          "pdf": "${PDF}",
+          "triggered_by": "${TRIGGERED_BY}"
         }
         EOF
         )

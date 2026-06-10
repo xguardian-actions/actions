@@ -1,5 +1,5 @@
-name: XGuardian Container Scan
-description: "Análise de segurança de imagens de container via Grype para a plataforma XGuardian."
+name: XGuardian SAST
+description: "Análise estática de código-fonte (SAST) para a plataforma XGuardian."
 author: "Xmart Solutions"
 
 branding:
@@ -32,23 +32,32 @@ inputs:
     description: "Descrição da aplicação no XGuardian."
     default: "Aplicação criada através do GitHub Actions - XGuardian"
     required: false
-  policy_container:
-    description: "ID da política de Container a ser aplicada. Use 0 para política padrão."
+  policy_sast:
+    description: "ID da política de SAST a ser aplicada. Use 0 para política padrão."
     default: "0"
     required: false
 
   # ========================================================================================
-  # CONFIGURAÇÕES DO SCAN CONTAINER
+  # CONFIGURAÇÕES DO SCAN
   # ========================================================================================
-  container_image:
-    description: "Nome e tag da imagem Docker a ser escaneada. Ex: minha-app:latest. A action executa docker save internamente e faz o upload do .tar para o XGuardian."
-    required: true
+  scan_directory:
+    description: "Diretório a ser zipado para o scan. Use '.' para todo o repositório."
+    default: "."
+    required: false
+  exclude:
+    description: "Lista de diretórios ou arquivos a excluir. Ex: 'node_modules/,dist/'"
+    default: ""
+    required: false
   translate:
     description: "Traduz o relatório para português do Brasil. Valores: true ou false"
     default: "false"
     required: false
   pdf:
     description: "Gera relatório em PDF após o scan. Valores: true ou false"
+    default: "false"
+    required: false
+  get_scan_id:
+    description: "Busca o ID do scan após o upload. Valores: true ou false"
     default: "false"
     required: false
   triggered_by:
@@ -64,9 +73,15 @@ outputs:
   app_id:
     description: "ID da aplicação no XGuardian"
     value: ${{ steps.final_outputs.outputs.app_id }}
+  scan_id:
+    description: "ID do scan executado"
+    value: ${{ steps.final_outputs.outputs.scan_id }}
   scan_url:
     description: "URL para visualizar os resultados do scan"
     value: ${{ steps.final_outputs.outputs.scan_url }}
+  scan_version:
+    description: "Versão do scan (app_name + SHA do commit)"
+    value: ${{ format('{0}-{1}', inputs.app_name, steps.vars.outputs.short_sha) }}
 
 runs:
   using: "composite"
@@ -77,9 +92,11 @@ runs:
         if [ "${{ inputs.is_development }}" == "true" ]; then
           echo "BASE_URL=https://shield.development.xguardianplatform.io" >> $GITHUB_ENV
           echo "UPLOADER_URL=https://uploader-mvp.development.xguardianplatform.io" >> $GITHUB_ENV
+          echo "REPORTER_URL=https://reporter.development.xguardianplatform.io" >> $GITHUB_ENV
         else
           echo "BASE_URL=https://shield.xguardianplatform.io" >> $GITHUB_ENV
           echo "UPLOADER_URL=https://uploader-mvp.xguardianplatform.io" >> $GITHUB_ENV
+          echo "REPORTER_URL=https://reporter.xguardianplatform.io" >> $GITHUB_ENV
         fi
 
     - name: Configurar token de autenticação
@@ -93,7 +110,7 @@ runs:
       run: |
         echo "::group::Instalação de dependências"
         sudo apt-get update -qq > /dev/null
-        sudo apt-get install -y --no-install-recommends curl jq > /dev/null
+        sudo apt-get install -y --no-install-recommends curl jq zip > /dev/null
         echo "✅ Dependências instaladas."
         echo "::endgroup::"
 
@@ -140,19 +157,19 @@ runs:
       shell: bash
       run: echo "short_sha=${GITHUB_SHA:0:6}" >> $GITHUB_OUTPUT
 
-    - name: Realizar o scan Container
+    - name: Criar scan SAST e obter URL de upload
       shell: bash
       env:
         UPLOADER_URL: ${{ env.UPLOADER_URL }}
-        API_TOKEN: ${{ env.API_TOKEN }}
         APP_ID: ${{ env.APP_ID }}
         SCAN_VERSION: ${{ format('{0}-{1}', inputs.app_name, steps.vars.outputs.short_sha) }}
-        CONTAINER_IMAGE: ${{ inputs.container_image }}
+        API_TOKEN: ${{ env.API_TOKEN }}
         TRANSLATE: ${{ inputs.translate }}
+        EXCLUDE: ${{ inputs.exclude }}
         PDF: ${{ inputs.pdf }}
         TRIGGERED_BY: ${{ inputs.triggered_by }}
       run: |
-        echo "::group::Executando scan Container"
+        echo "::group::Preparando scan SAST"
         if [ "${APP_ID}" = "N/A" ]; then
           RESPONSE=$(curl -sS -X GET "${UPLOADER_URL}/get_apps_new?page=1&items_per_page=10" \
             -H 'accept: application/json' \
@@ -161,72 +178,122 @@ runs:
           echo "APP_ID=$APP_ID" >> $GITHUB_ENV
         fi
 
-        IMAGE_NAME=$(echo "${CONTAINER_IMAGE}" | tr ':/' '-')
-        TAR_FILE="${IMAGE_NAME}.tar"
-
-        echo "🐳 Salvando imagem ${CONTAINER_IMAGE} como ${TAR_FILE}..."
-        docker save "${CONTAINER_IMAGE}" -o "${TAR_FILE}"
-
         DATA=$(cat << EOF
         {
-          "app_id": "${APP_ID}",
+          "app_id": ${APP_ID},
           "scan_version": "${SCAN_VERSION}",
-          "file_type": "tar",
-          "container": "${CONTAINER_IMAGE}",
+          "file_type": "application/zip",
+          "sca": "false",
+          "sast": "true",
           "translate": "${TRANSLATE}",
+          "exclude": "${EXCLUDE}",
           "pdf": "${PDF}",
           "triggered_by": "${TRIGGERED_BY}"
         }
         EOF
         )
 
-        RESPONSE=$(curl -sS -X POST "${UPLOADER_URL}/upload-container" \
+        RESPONSE=$(curl -sS -X POST "${UPLOADER_URL}/upload-url" \
           -H 'accept: application/json' \
-          -H "Authorization: Bearer ${API_TOKEN}" \
           -H 'Content-Type: application/json' \
+          -H "Authorization: Bearer ${API_TOKEN}" \
           -d "${DATA}")
 
-        PRESIGNED_URL=$(echo "$RESPONSE" | jq -r '.url // empty')
-
-        if [ -z "${PRESIGNED_URL}" ]; then
-          ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error // .message // .detail // "Erro desconhecido"')
-          echo "::error title=XGuardian Container::Falha ao obter URL de upload: ${ERROR_MSG}"
-          echo "::endgroup::"
+        GET_UPLOAD_URL=$(echo "${RESPONSE}" | jq -r '.url')
+        if [ -z "$GET_UPLOAD_URL" ] || [ "$GET_UPLOAD_URL" = "null" ]; then
+          echo "::error::Não foi possível obter a URL de upload."
           exit 1
         fi
+        echo "GET_UPLOAD_URL=${GET_UPLOAD_URL}" >> $GITHUB_ENV
+        echo "✅ URL de upload obtida."
+        echo "::endgroup::"
 
-        echo "🚀 Fazendo upload do .tar para S3..."
-        curl -sS -X PUT "${PRESIGNED_URL}" \
-          -H "Content-Type: application/x-tar" \
-          --data-binary "@${TAR_FILE}"
+    - name: Zipar os arquivos
+      shell: bash
+      env:
+        APP_NAME: ${{ inputs.app_name }}
+        SCAN_DIR: ${{ inputs.scan_directory }}
+      run: |
+        echo "::group::Criando arquivo ZIP"
+        SAFE_APP_NAME=$(echo "${APP_NAME}" | tr '/' '_')
+        echo "SAFE_APP_NAME=${SAFE_APP_NAME}" >> $GITHUB_ENV
+        if [ "$SCAN_DIR" = "." ]; then
+          zip -rq "${SAFE_APP_NAME}.zip" . -x "*.git/*" "*/node_modules/*" "*.env" "*.zip"
+        else
+          zip -rq "${SAFE_APP_NAME}.zip" "$SCAN_DIR" -x "*.git/*" "*/node_modules/*" "*.env" "*.zip"
+        fi
+        echo "✅ ZIP criado: ${SAFE_APP_NAME}.zip ($(du -h "${SAFE_APP_NAME}.zip" | cut -f1))"
+        echo "::endgroup::"
 
-        echo "✅ Container scan enviado com sucesso!"
-        echo "::notice title=XGuardian Container::Scan enviado para ${CONTAINER_IMAGE}"
+    - name: Upload para o XGuardian
+      shell: bash
+      env:
+        SAFE_APP_NAME: ${{ env.SAFE_APP_NAME }}
+        GET_UPLOAD_URL: ${{ env.GET_UPLOAD_URL }}
+      run: |
+        echo "::group::Upload do arquivo ZIP"
+        curl -# --fail --location --request PUT "${GET_UPLOAD_URL}" \
+          --header 'Content-Type: application/zip' \
+          --data-binary "@./${SAFE_APP_NAME}.zip"
+        echo "✅ Upload concluído."
+        echo "::endgroup::"
+
+    - name: Aguardar e buscar ID do scan
+      shell: bash
+      if: ${{ inputs.get_scan_id == 'true' }}
+      env:
+        REPORTER_URL: ${{ env.REPORTER_URL }}
+        BASE_URL: ${{ env.BASE_URL }}
+        APP_ID: ${{ env.APP_ID }}
+        API_TOKEN: ${{ env.API_TOKEN }}
+        SCAN_VERSION: ${{ format('{0}-{1}', inputs.app_name, steps.vars.outputs.short_sha) }}
+      run: |
+        echo "::group::Buscando ID do scan"
+        sleep 30
+        for i in {1..30}; do
+          RESPONSE=$(curl -sS -X GET "${REPORTER_URL}/get_scan_pagination/${APP_ID}?page=1&items_per_page=10" \
+            -H 'accept: application/json' \
+            -H "Authorization: Bearer ${API_TOKEN}")
+          SCAN_DATA=$(echo "$RESPONSE" | jq -r --arg v "$SCAN_VERSION" '.data[] | select(.scanuuid == $v)')
+          if [ -n "$SCAN_DATA" ]; then
+            SCAN_ID=$(echo "$SCAN_DATA" | jq -r '.id')
+            echo "APP_ID=${APP_ID}" >> $GITHUB_ENV
+            echo "SCAN_ID=${SCAN_ID}" >> $GITHUB_ENV
+            echo "SCAN_URL=${BASE_URL}/aplicacoes/${APP_ID}/scans" >> $GITHUB_ENV
+            echo "${APP_ID}:${SCAN_ID}" > /tmp/xguardian_scan_complete
+            echo "✅ Scan encontrado: $SCAN_ID"
+            break
+          fi
+          sleep 10
+        done
         echo "::endgroup::"
 
     - name: Finalizar outputs
       id: final_outputs
       shell: bash
+      if: ${{ inputs.get_scan_id == 'true' }}
       env:
         BASE_URL: ${{ env.BASE_URL }}
-        APP_ID: ${{ env.APP_ID }}
       run: |
-        echo "app_id=${APP_ID}" >> "$GITHUB_OUTPUT"
-        echo "scan_url=${BASE_URL}/aplicacoes/${APP_ID}/scans" >> "$GITHUB_OUTPUT"
+        IFS=':' read -r app_id scan_id < /tmp/xguardian_scan_complete
+        echo "app_id=$app_id" >> "$GITHUB_OUTPUT"
+        echo "scan_id=$scan_id" >> "$GITHUB_OUTPUT"
+        echo "scan_url=${BASE_URL}/aplicacoes/$app_id/scans" >> "$GITHUB_OUTPUT"
 
     - name: Resumo da execução
       shell: bash
       if: always()
       env:
         APP_ID: ${{ env.APP_ID }}
+        SCAN_ID: ${{ env.SCAN_ID }}
+        SCAN_URL: ${{ env.SCAN_URL }}
         APP_NAME: ${{ inputs.app_name }}
-        BASE_URL: ${{ env.BASE_URL }}
       run: |
         echo "┌─────────────────────────────────────────────────────────┐"
-        echo "│ XGuardian Container Scan — Resumo                       │"
+        echo "│ XGuardian SAST — Resumo                                 │"
         echo "├─────────────────────────────────────────────────────────┤"
         echo "│ Aplicação : ${APP_NAME}"
-        echo "│ Imagem    : ${{ inputs.container_image }}"
         echo "│ App ID    : ${APP_ID:-Não disponível}"
-        [ -n "${APP_ID}" ] && echo "│ URL       : ${BASE_URL}/aplicacoes/${APP_ID}/scans"
+        echo "│ Scan ID   : ${SCAN_ID:-Não disponível}"
+        [ -n "${SCAN_URL}" ] && echo "│ URL       : ${SCAN_URL}"
         echo "└─────────────────────────────────────────────────────────┘"

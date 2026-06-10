@@ -5,7 +5,6 @@ author: "Xmart Solutions"
 branding:
   icon: "shield"
   color: purple
-version: v26.6.1
 
 inputs:
   # ========================================================================================
@@ -45,6 +44,14 @@ inputs:
   # ========================================================================================
   # CONFIGURAÇÕES DO SCAN
   # ========================================================================================
+  sast:
+    description: "Ativa análise estática de código-fonte. Valores: true ou false"
+    default: "true"
+    required: false
+  sca:
+    description: "Ativa análise de dependências. Valores: true ou false"
+    default: "true"
+    required: false
   scan_directory:
     description: "Diretório a ser zipado para o scan. Use '.' para todo o repositório."
     default: "."
@@ -72,6 +79,10 @@ inputs:
   save_vulns:
     description: "Salva as vulnerabilidades no banco de dados do XGuardian. Valores: true ou false"
     default: "false"
+    required: false
+  triggered_by:
+    description: "Username GitHub que acionou o scan (auto-reportado)."
+    default: ${{ github.actor }}
     required: false
   is_development:
     description: "Usar ambiente de desenvolvimento. Valores: true ou false"
@@ -185,6 +196,7 @@ runs:
         TRANSLATE: ${{ inputs.translate }}
         EXCLUDE: ${{ inputs.exclude }}
         PDF: ${{ inputs.pdf }}
+        TRIGGERED_BY: ${{ inputs.triggered_by }}
       run: |
         echo "::group::Preparando scan SAST/SCA"
         if [ "${APP_ID}" = "N/A" ]; then
@@ -204,7 +216,8 @@ runs:
           "sast": "${{ inputs.sast }}",
           "translate": "${TRANSLATE}",
           "exclude": "${EXCLUDE}",
-          "pdf": "${PDF}"
+          "pdf": "${PDF}",
+          "triggered_by": "${TRIGGERED_BY}"
         }
         EOF
         )
