@@ -131,6 +131,11 @@ runs:
       run: |
         echo "::group::Verificando aplicação"
 
+        if [ -z "${{ inputs.app_id }}" ] && [ -z "${{ inputs.app_name }}" ]; then
+          echo "::error::É necessário fornecer app_id ou app_name."
+          exit 1
+        fi
+
         if [ -n "${{ inputs.app_id }}" ]; then
           echo "APP_ID=${{ inputs.app_id }}" >> $GITHUB_ENV
           echo "✅ Usando app_id fornecido: ${{ inputs.app_id }}"
@@ -179,6 +184,7 @@ runs:
       env:
         UPLOADER_URL: ${{ env.UPLOADER_URL }}
         APP_ID: ${{ env.APP_ID }}
+        APP_NAME: ${{ steps.vars.outputs.app_label }}
         SCAN_VERSION: ${{ steps.vars.outputs.app_label }}-${{ steps.vars.outputs.short_sha }}
         API_TOKEN: ${{ env.API_TOKEN }}
         TRANSLATE: ${{ inputs.translate }}
@@ -191,7 +197,11 @@ runs:
           RESPONSE=$(curl -sS -X GET "${UPLOADER_URL}/get_apps_new?page=1&items_per_page=10" \
             -H 'accept: application/json' \
             -H "Authorization: Bearer ${API_TOKEN}")
-          APP_ID=$(echo "$RESPONSE" | jq -r --arg NAME "${{ inputs.app_name }}" '.data[] | select(.name == $NAME) | .id' | head -n 1)
+          APP_ID=$(echo "$RESPONSE" | jq -r --arg NAME "${APP_NAME}" '.data[] | select(.name == $NAME) | .id' | head -n 1)
+          if [ -z "$APP_ID" ]; then
+            echo "::error::Aplicação não encontrada após criação. Verifique o app_name informado."
+            exit 1
+          fi
           echo "APP_ID=$APP_ID" >> $GITHUB_ENV
         fi
 
@@ -228,7 +238,7 @@ runs:
     - name: Zipar os arquivos
       shell: bash
       env:
-        APP_NAME: ${{ inputs.app_name }}
+        APP_NAME: ${{ steps.vars.outputs.app_label }}
         SCAN_DIR: ${{ inputs.scan_directory }}
       run: |
         echo "::group::Criando arquivo ZIP"
@@ -304,7 +314,7 @@ runs:
         APP_ID: ${{ env.APP_ID }}
         SCAN_ID: ${{ env.SCAN_ID }}
         SCAN_URL: ${{ env.SCAN_URL }}
-        APP_NAME: ${{ inputs.app_name }}
+        APP_NAME: ${{ steps.vars.outputs.app_label }}
       run: |
         echo "┌─────────────────────────────────────────────────────────┐"
         echo "│ XGuardian SAST — Resumo                                 │"
