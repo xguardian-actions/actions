@@ -18,8 +18,9 @@ inputs:
   # CONFIGURAÇÃO DA APLICAÇÃO
   # ========================================================================================
   app_name:
-    description: "Nome da aplicação a ser escaneada."
-    required: true
+    description: "Nome da aplicação a ser escaneada. Obrigatório apenas ao criar app nova."
+    required: false
+    default: ""
   app_id:
     description: "ID da aplicação no XGuardian. Se informado, pula a busca/criação automática."
     required: false
@@ -150,7 +151,11 @@ runs:
     - name: Obter short_sha
       id: vars
       shell: bash
-      run: echo "short_sha=${GITHUB_SHA:0:6}" >> $GITHUB_OUTPUT
+      run: |
+        echo "short_sha=${GITHUB_SHA:0:6}" >> $GITHUB_OUTPUT
+        APP_LABEL="${{ inputs.app_name }}"
+        if [ -z "${APP_LABEL}" ]; then APP_LABEL="${{ inputs.app_id }}"; fi
+        echo "app_label=${APP_LABEL}" >> $GITHUB_OUTPUT
 
     - name: Realizar o scan Container
       shell: bash
@@ -158,7 +163,7 @@ runs:
         UPLOADER_URL: ${{ env.UPLOADER_URL }}
         API_TOKEN: ${{ env.API_TOKEN }}
         APP_ID: ${{ env.APP_ID }}
-        SCAN_VERSION: ${{ format('{0}-{1}', inputs.app_name, steps.vars.outputs.short_sha) }}
+        SCAN_VERSION: ${{ steps.vars.outputs.app_label }}-${{ steps.vars.outputs.short_sha }}
         CONTAINER_IMAGE: ${{ inputs.container_image }}
         TRANSLATE: ${{ inputs.translate }}
         PDF: ${{ inputs.pdf }}

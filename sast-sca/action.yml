@@ -18,8 +18,9 @@ inputs:
   # CONFIGURAÇÃO DA APLICAÇÃO
   # ========================================================================================
   app_name:
-    description: "Nome da aplicação a ser escaneada."
-    required: true
+    description: "Nome da aplicação a ser escaneada. Obrigatório apenas ao criar app nova."
+    required: false
+    default: ""
   app_id:
     description: "ID da aplicação no XGuardian. Se informado, pula a busca/criação automática."
     required: false
@@ -105,7 +106,7 @@ outputs:
     value: ${{ steps.final_outputs.outputs.scan_url }}
   scan_version:
     description: "Versão do scan (app_name + SHA do commit)"
-    value: ${{ format('{0}-{1}', inputs.app_name, steps.vars.outputs.short_sha) }}
+    value: ${{ steps.vars.outputs.app_label }}-${{ steps.vars.outputs.short_sha }}
 
 runs:
   using: "composite"
@@ -196,14 +197,18 @@ runs:
     - name: Obter short_sha
       id: vars
       shell: bash
-      run: echo "short_sha=${GITHUB_SHA:0:6}" >> $GITHUB_OUTPUT
+      run: |
+        echo "short_sha=${GITHUB_SHA:0:6}" >> $GITHUB_OUTPUT
+        APP_LABEL="${{ inputs.app_name }}"
+        if [ -z "${APP_LABEL}" ]; then APP_LABEL="${{ inputs.app_id }}"; fi
+        echo "app_label=${APP_LABEL}" >> $GITHUB_OUTPUT
 
     - name: Criar scan SAST/SCA e obter URL de upload
       shell: bash
       env:
         UPLOADER_URL: ${{ env.UPLOADER_URL }}
         APP_ID: ${{ env.APP_ID }}
-        SCAN_VERSION: ${{ format('{0}-{1}', inputs.app_name, steps.vars.outputs.short_sha) }}
+        SCAN_VERSION: ${{ steps.vars.outputs.app_label }}-${{ steps.vars.outputs.short_sha }}
         API_TOKEN: ${{ env.API_TOKEN }}
         TRANSLATE: ${{ inputs.translate }}
         EXCLUDE: ${{ inputs.exclude }}
@@ -287,7 +292,7 @@ runs:
         BASE_URL: ${{ env.BASE_URL }}
         APP_ID: ${{ env.APP_ID }}
         API_TOKEN: ${{ env.API_TOKEN }}
-        SCAN_VERSION: ${{ format('{0}-{1}', inputs.app_name, steps.vars.outputs.short_sha) }}
+        SCAN_VERSION: ${{ steps.vars.outputs.app_label }}-${{ steps.vars.outputs.short_sha }}
       run: |
         echo "::group::Buscando ID do scan"
         sleep 30
