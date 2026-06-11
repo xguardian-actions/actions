@@ -110,9 +110,9 @@ runs:
     - name: Configurar endpoints do XGuardian
       shell: bash
       run: |
-        echo "BASE_URL=https://shield.development.xguardianplatform.io" >> $GITHUB_ENV
-        echo "UPLOADER_URL=https://uploader-mvp.development.xguardianplatform.io" >> $GITHUB_ENV
-        echo "REPORTER_URL=https://reporter.development.xguardianplatform.io" >> $GITHUB_ENV
+        echo "BASE_URL=https://shield.xguardianplatform.io" >> $GITHUB_ENV
+        echo "UPLOADER_URL=https://uploader-mvp.xguardianplatform.io" >> $GITHUB_ENV
+        echo "REPORTER_URL=https://reporter.xguardianplatform.io" >> $GITHUB_ENV
 
     - name: Configurar token de autenticação
       shell: bash
