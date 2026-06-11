@@ -7,7 +7,7 @@ Executa análise dinâmica de aplicações web (DAST) com suporte a autenticaç�
 ## Uso
 
 ```yaml
-- uses: xguardian-actions/actions/dast-web@main
+- uses: xguardian-actions/actions/dast-web@v26.6.1
   with:
     token: ${{ secrets.XGUARDIAN_TOKEN }}
     app_name: "minha-app"

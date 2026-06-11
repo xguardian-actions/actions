@@ -1,4 +1,4 @@
-<div align="center">
+Lukin<div align="center">
   <img src="XGuardian.png" alt="XGuardian Logo" width="200"/>
 
   # XGuardian Security Action
@@ -48,7 +48,7 @@
 ## Uso rápido
 
 ```yaml
-- uses: xguardian-actions/actions/sast-sca@main
+- uses: xguardian-actions/actions/sast-sca@v26.6.1
   with:
     token: ${{ secrets.XGUARDIAN_TOKEN }}
     app_name: "minha-app"
@@ -57,6 +57,17 @@
 ```
 
 Para exemplos completos, acesse o README de cada scan na tabela acima.
+
+### Fixando a versão (recomendado)
+
+Sempre referencie uma versão estável, nunca `@main` (que muda a cada atualização):
+
+```yaml
+- uses: xguardian-actions/actions/sast-sca@v26.6.1   # tag estável (recomendado)
+# - uses: xguardian-actions/actions/sast-sca@b526c5d  # SHA do commit (máxima imutabilidade)
+```
+
+Para a maior garantia de supply chain, fixe pelo SHA do commit da release — assim sua pipeline executa sempre exatamente o mesmo código auditado.
 
 ---
 

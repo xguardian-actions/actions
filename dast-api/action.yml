@@ -87,10 +87,13 @@ runs:
 
     - name: Configurar token de autenticação
       shell: bash
+      env:
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_API_TOKEN: ${{ inputs.api_token }}
       run: |
-        echo "::add-mask::${{ inputs.token }}"
-        echo "::add-mask::${{ inputs.api_token }}"
-        echo "API_TOKEN=${{ inputs.token }}" >> $GITHUB_ENV
+        echo "::add-mask::$INPUT_TOKEN"
+        echo "::add-mask::$INPUT_API_TOKEN"
+        echo "API_TOKEN=$INPUT_TOKEN" >> $GITHUB_ENV
 
     - name: Instalar dependências
       shell: bash
@@ -105,6 +108,7 @@ runs:
       shell: bash
       env:
         UPLOADER_URL: ${{ env.UPLOADER_URL }}
+        APP_ID_INPUT: ${{ inputs.app_id }}
         APP_NAME: ${{ inputs.app_name }}
         API_TOKEN: ${{ env.API_TOKEN }}
         TEAM_ID: ${{ inputs.team_id }}
@@ -113,14 +117,14 @@ runs:
       run: |
         echo "::group::Verificando aplicação"
 
-        if [ -z "${{ inputs.app_id }}" ] && [ -z "${{ inputs.app_name }}" ]; then
+        if [ -z "$APP_ID_INPUT" ] && [ -z "$APP_NAME" ]; then
           echo "::error::É necessário fornecer app_id ou app_name."
           exit 1
         fi
 
-        if [ -n "${{ inputs.app_id }}" ]; then
-          echo "APP_ID=${{ inputs.app_id }}" >> $GITHUB_ENV
-          echo "✅ Usando app_id fornecido: ${{ inputs.app_id }}"
+        if [ -n "$APP_ID_INPUT" ]; then
+          echo "APP_ID=$APP_ID_INPUT" >> $GITHUB_ENV
+          echo "✅ Usando app_id fornecido: $APP_ID_INPUT"
           echo "::endgroup::"
           exit 0
         fi
@@ -137,7 +141,12 @@ runs:
           echo "APP_ID=$APP_ID" >> $GITHUB_ENV
         else
           echo "Criando nova aplicação..."
-          JSON_CONTENT='{"app_name": "'"${APP_NAME}"'","team_id": '"${TEAM_ID}"',"languages": '"${LANGUAGES}"',"description": "'"${DESCRIPTION}"'"}'
+          JSON_CONTENT=$(jq -n \
+            --arg name "$APP_NAME" \
+            --argjson team "$TEAM_ID" \
+            --argjson langs "$LANGUAGES" \
+            --arg desc "$DESCRIPTION" \
+            '{app_name: $name, team_id: $team, languages: $langs, description: $desc}')
           RESPONSE=$(curl -sS -X POST "${UPLOADER_URL}/create_apps" \
             -H 'accept: application/json' \
             -H "Authorization: Bearer ${API_TOKEN}" \
@@ -155,10 +164,13 @@ runs:
     - name: Obter short_sha
       id: vars
       shell: bash
+      env:
+        APP_NAME: ${{ inputs.app_name }}
+        APP_ID_INPUT: ${{ inputs.app_id }}
       run: |
         echo "short_sha=${GITHUB_SHA:0:6}" >> $GITHUB_OUTPUT
-        APP_LABEL="${{ inputs.app_name }}"
-        if [ -z "${APP_LABEL}" ]; then APP_LABEL="${{ inputs.app_id }}"; fi
+        APP_LABEL="$APP_NAME"
+        if [ -z "${APP_LABEL}" ]; then APP_LABEL="$APP_ID_INPUT"; fi
         echo "app_label=${APP_LABEL}" >> $GITHUB_OUTPUT
 
     - name: Realizar o scan DAST API
@@ -288,12 +300,13 @@ runs:
         SCAN_ID: ${{ env.SCAN_ID }}
         APP_NAME: ${{ steps.vars.outputs.app_label }}
         BASE_URL: ${{ env.BASE_URL }}
+        SITE_URL: ${{ inputs.site_url }}
       run: |
         echo "┌─────────────────────────────────────────────────────────┐"
         echo "│ XGuardian DAST API — Resumo                             │"
         echo "├─────────────────────────────────────────────────────────┤"
         echo "│ Aplicação : ${APP_NAME}"
-        echo "│ URL alvo  : ${{ inputs.site_url }}"
+        echo "│ URL alvo  : ${SITE_URL}"
         echo "│ App ID    : ${APP_ID:-Não disponível}"
         echo "│ Scan ID   : ${SCAN_ID:-Não disponível}"
         [ -n "${APP_ID}" ] && echo "│ URL       : ${BASE_URL}/aplicacoes/${APP_ID}/scans"
