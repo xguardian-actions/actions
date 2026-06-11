@@ -191,7 +191,7 @@ runs:
           "app_id": "${APP_ID}",
           "scan_version": "${SCAN_VERSION}",
           "file_type": "application/x-tar",
-          "container": "${CONTAINER_IMAGE}",
+          "container": "true",
           "translate": "${TRANSLATE}",
           "pdf": "${PDF}",
           "triggered_by": "${TRIGGERED_BY}"

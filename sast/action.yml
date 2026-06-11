@@ -216,7 +216,6 @@ runs:
           -H "Authorization: Bearer ${API_TOKEN}" \
           -d "${DATA}")
 
-        echo "Backend response: ${RESPONSE}"
         GET_UPLOAD_URL=$(echo "${RESPONSE}" | jq -r '.url')
         if [ -z "$GET_UPLOAD_URL" ] || [ "$GET_UPLOAD_URL" = "null" ]; then
           echo "::error::Não foi possível obter a URL de upload."
