@@ -5,7 +5,7 @@ Executa análise estática de código-fonte (SAST) e análise de composição de
 ## Uso
 
 ```yaml
-- uses: xguardian-actions/actions/sast-sca@main
+- uses: xguardian-actions/actions/sast-sca@v26.6.1
   with:
     token: ${{ secrets.XGUARDIAN_TOKEN }}
     app_name: "minha-app"

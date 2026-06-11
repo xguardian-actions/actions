@@ -7,7 +7,7 @@ Executa análise dinâmica de APIs REST (DAST) com autenticação via Bearer tok
 ## Uso
 
 ```yaml
-- uses: xguardian-actions/actions/dast-api@main
+- uses: xguardian-actions/actions/dast-api@v26.6.1
   with:
     token: ${{ secrets.XGUARDIAN_TOKEN }}
     app_name: "minha-api"

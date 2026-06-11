@@ -10,7 +10,7 @@ A imagem Docker deve estar disponível no runner antes de chamar esta action. Ex
 - name: Build da imagem
   run: docker build -t minha-app:${{ github.sha }} .
 
-- uses: xguardian-actions/actions/container@main
+- uses: xguardian-actions/actions/container@v26.6.1
   with:
     token: ${{ secrets.XGUARDIAN_TOKEN }}
     app_name: "minha-app"

@@ -5,7 +5,7 @@ Executa exclusivamente análise de composição de software (SCA), verificando v
 ## Uso
 
 ```yaml
-- uses: xguardian-actions/actions/sca@main
+- uses: xguardian-actions/actions/sca@v26.6.1
   with:
     token: ${{ secrets.XGUARDIAN_TOKEN }}
     app_name: "minha-app"
