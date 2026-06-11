@@ -76,3 +76,14 @@ Para a maior garantia de supply chain, fixe pelo SHA do commit da release — as
 Pipelines de ingestão de ferramentas externas (ex: Sonatype IQ) estão disponíveis em:
 
 **[xguardian-actions/integrations](https://github.com/xguardian-actions/integrations)**
+
+---
+
+## Licença
+
+© 2026 XMART SOLUTIONS SEGURANCA DIGITAL LTDA - EPP. Todos os direitos reservados.
+
+Software proprietário. O uso destas GitHub Actions é permitido **exclusivamente**
+para integração com a plataforma XGuardian. É proibido copiar, redistribuir,
+modificar ou utilizar a lógica destas actions para desenvolver produto ou serviço
+concorrente. Consulte o arquivo [LICENSE](LICENSE) para os termos completos.
