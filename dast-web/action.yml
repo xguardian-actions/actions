@@ -240,6 +240,8 @@ runs:
         else
           ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error // .message // .detail // "Erro desconhecido"')
           echo "::error title=XGuardian DAST Web::Falha ao iniciar scan: ${ERROR_MSG}"
+          echo "::endgroup::"
+          exit 1
         fi
         echo "::endgroup::"
 
