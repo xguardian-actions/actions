@@ -232,10 +232,8 @@ runs:
           -H 'Content-Type: application/json' \
           -d "${DATA}")
 
-        if echo "$RESPONSE" | grep -q '"scan_id"'; then
-          SCAN_ID=$(echo "$RESPONSE" | jq -r '.scan_id')
-          echo "SCAN_ID=${SCAN_ID}" >> $GITHUB_ENV
-          echo "✅ Scan DAST Web iniciado: ${SCAN_ID}"
+        if echo "$RESPONSE" | grep -q 'Upload realizado com sucesso'; then
+          echo "✅ Scan DAST Web iniciado: ${SCAN_VERSION}"
           echo "::notice title=XGuardian DAST Web::Scan iniciado para ${SITE_URL}"
         else
           ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error // .message // .detail // "Erro desconhecido"')
@@ -263,7 +261,11 @@ runs:
             -H 'accept: application/json' -H "Authorization: Bearer ${API_TOKEN}")
           echo "$response" | jq . >/dev/null 2>&1 || { echo "⚠️ JSON inválido."; return 1; }
           SCAN_DATA=$(echo "$response" | jq -r --arg v "${SCAN_VERSION}" '.data[] | select(.scanuuid == $v)')
-          [ -n "$SCAN_DATA" ] && [ "$SCAN_DATA" != "null" ] && SCAN_STATUS=$(echo "$SCAN_DATA" | jq -r '.scan_status') && return 0
+          if [ -n "$SCAN_DATA" ] && [ "$SCAN_DATA" != "null" ]; then
+            SCAN_STATUS=$(echo "$SCAN_DATA" | jq -r '.scan_status')
+            echo "SCAN_ID=$(echo "$SCAN_DATA" | jq -r '.id')" >> $GITHUB_ENV
+            return 0
+          fi
           echo "⚠️ Scan não encontrado na resposta."
           return 1
         }
