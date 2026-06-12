@@ -1,4 +1,4 @@
-<div align="center">
+Lukin<div align="center">
   <img src="XGuardian.png" alt="XGuardian Logo" width="200"/>
 
   # XGuardian Security Action
@@ -48,7 +48,7 @@
 ## Uso rápido
 
 ```yaml
-- uses: xguardian-actions/actions/sast-sca@main
+- uses: xguardian-actions/actions/sast-sca@v26.6.1
   with:
     token: ${{ secrets.XGUARDIAN_TOKEN }}
     app_name: "minha-app"
@@ -58,6 +58,17 @@
 
 Para exemplos completos, acesse o README de cada scan na tabela acima.
 
+### Fixando a versão (recomendado)
+
+Sempre referencie uma versão estável, nunca `@main` (que muda a cada atualização):
+
+```yaml
+- uses: xguardian-actions/actions/sast-sca@v26.6.1   # tag estável (recomendado)
+# - uses: xguardian-actions/actions/sast-sca@b526c5d  # SHA do commit (máxima imutabilidade)
+```
+
+Para a maior garantia de supply chain, fixe pelo SHA do commit da release — assim sua pipeline executa sempre exatamente o mesmo código auditado.
+
 ---
 
 ## Integrações externas
@@ -65,3 +76,14 @@ Para exemplos completos, acesse o README de cada scan na tabela acima.
 Pipelines de ingestão de ferramentas externas (ex: Sonatype IQ) estão disponíveis em:
 
 **[xguardian-actions/integrations](https://github.com/xguardian-actions/integrations)**
+
+---
+
+## Licença
+
+© 2026 XMART SOLUTIONS SEGURANCA DIGITAL LTDA - EPP. Todos os direitos reservados.
+
+Software proprietário. O uso destas GitHub Actions é permitido **exclusivamente**
+para integração com a plataforma XGuardian. É proibido copiar, redistribuir,
+modificar ou utilizar a lógica destas actions para desenvolver produto ou serviço
+concorrente. Consulte o arquivo [LICENSE](LICENSE) para os termos completos.
