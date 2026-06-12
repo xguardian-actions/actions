@@ -5,7 +5,7 @@ Lukin<div align="center">
 
   **Análises de segurança automatizadas direto do seu pipeline GitHub Actions**
 
-  ![Versão](https://img.shields.io/badge/versão-v26.6.1-purple)
+  ![Versão](https://img.shields.io/badge/versão-v26.6.2-purple)
   ![GitHub Marketplace](https://img.shields.io/badge/GitHub-Marketplace-blue?logo=github)
   ![GitHub Actions](https://img.shields.io/badge/GitHub-Actions-2088FF?logo=github-actions&logoColor=white)
 </div>
